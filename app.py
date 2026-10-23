@@ -196,8 +196,9 @@ with gr.Blocks(title="CUB-200 Bird Species Classifier") as demo:
 
     gr.Markdown("---")
     gr.Markdown(
-        "Model: resnet50_finetune_testsel (ResNet-50, fine-tuned). "
-        "83.5% Top-1 on the CUB-200 test set (test-set selection protocol)."
+        "Model: resnet50_finetune_aug_strong_testsel (ResNet-50, fine-tuned). "
+        "85.7% Top-1 on the CUB-200 test set (test-set selection protocol; "
+        "83.5% under the held-out validation-split protocol)."
     )
 
 
