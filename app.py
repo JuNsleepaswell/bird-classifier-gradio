@@ -1,16 +1,7 @@
 
-# app.py -- Gradio demo for the CUB-200 bird classifier, with a GradCAM++
-# explanation, for deployment on Render's free tier.
-# generated from notebooks/main.ipynb via %%writefile (Phase 7.7), build output,
-# not hand-edited. edit the Phase 7.7 cell and re-run to change it.
-#
-# no torch here on purpose, just onnxruntime (CPU) + PIL + numpy -- the model
-# is exported with two ONNX outputs (logits, layer4 feature maps) and GradCAM++
-# is reimplemented in numpy from those plus the classifier's saved Linear
-# weights, following pytorch_grad_cam.GradCAMPlusPlus's own formula. Since the
-# head is global-average-pool + Linear, the gradient of a class logit w.r.t. a
-# layer4 activation is exactly weight[c, k] / (H * W) at every spatial
-# position, so no autograd is needed to get it.
+# app.py -- Gradio demo with a GradCAM++ explanation, generated from notebooks/main.ipynb (Phase 7.7).
+
+# no torch at runtime, GradCAM++ runs in numpy using weight[c,k]/(H*W) as the layer4 gradient.
 
 import json
 import os
@@ -44,10 +35,7 @@ SESSION = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
 
 
 def _resize_and_crop(image):
-    # short side -> 256, long side truncated (not rounded) to match
-    # torchvision's Resize(256) on a PIL image, then a 224 center crop with
-    # offsets rounded (not floored) to match torchvision's CenterCrop -- same
-    # formula as app_streamlit/streamlit_app.py's preprocess()
+    # resize short side to 256 (truncated) and crop offsets rounded, same formula as the streamlit app
     image = image.convert("RGB")
     w, h = image.size
     if w <= h:
@@ -61,8 +49,7 @@ def _resize_and_crop(image):
 
 
 def preprocess(image):
-    # returns the normalised NCHW tensor for the model, plus the cropped
-    # 224x224 RGB PIL image (pre-normalisation) used as the GradCAM overlay base
+    # returns the normalised NCHW tensor plus the cropped 224x224 image used as the GradCAM overlay base
     cropped = _resize_and_crop(image)
     arr = np.asarray(cropped).astype(np.float32) / 255.0
     arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
@@ -82,10 +69,7 @@ def run_model(tensor):
 
 
 def gradcam_plusplus(layer4_features, class_weight_row):
-    # pytorch_grad_cam.GradCAMPlusPlus's own weight formula (grad_cam_plusplus.py),
-    # applied to a gradient that's constant over the spatial grid per channel:
-    # d(logit_c)/d(layer4[k, i, j]) = class_weight_row[k] / (H * W) for every (i, j),
-    # since the head is global-average-pool (mean over H*W) then a Linear layer.
+    # pytorch_grad_cam's GradCAMPlusPlus formula, gradient is constant per channel under GAP+Linear
     C, H, W = layer4_features.shape
     grads = np.broadcast_to((class_weight_row / (H * W))[:, None, None], (C, H, W)).astype(np.float32)
     grads_power_2 = grads ** 2
@@ -101,8 +85,7 @@ def gradcam_plusplus(layer4_features, class_weight_row):
     cam = cam - cam.min()
     cam = cam / (1e-7 + cam.max())
 
-    # pytorch_grad_cam normalises at native resolution, then resizes up to the
-    # input size (cv2.resize there, PIL BILINEAR here since app.py avoids cv2)
+    # pytorch_grad_cam normalises then resizes to input size, here via PIL BILINEAR instead of cv2
     cam_resized = np.asarray(
         Image.fromarray(cam.astype(np.float32), mode="F").resize((IMG_SIZE, IMG_SIZE), Image.BILINEAR),
         dtype=np.float32,
@@ -141,8 +124,7 @@ def predict(image):
 
 
 def gradcam_overlay(image, class_idx=None):
-    # PIL image in, PIL image out (GradCAM++ heatmap blended onto the input),
-    # defaults to the model's own top-1 class if none is given
+    # PIL image in, PIL image out, defaults to the model's own top-1 class if none is given
     tensor, cropped = preprocess(image)
     logits, layer4_features = run_model(tensor)
     if class_idx is None:
@@ -152,8 +134,7 @@ def gradcam_overlay(image, class_idx=None):
 
 
 def classify(image):
-    # single entry point the Gradio UI calls: does one forward pass and
-    # returns everything the three output components need
+    # single entry point the Gradio UI calls, does one forward pass for all three outputs
     if image is None:
         return {}, None, gr.update(visible=False)
 

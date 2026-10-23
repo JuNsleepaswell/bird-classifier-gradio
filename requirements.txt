@@ -1,6 +1,4 @@
-# no torch/torchvision here, the app runs the exported ONNX graph (two
-# outputs: logits + layer4 features) on CPU through onnxruntime and does its
-# own PIL preprocessing + numpy GradCAM++
+# no torch/torchvision, runs the exported ONNX graph (logits + layer4 features) through onnxruntime
 gradio==6.30.0
 onnxruntime==1.31.0
 Pillow==11.3.0
